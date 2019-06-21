@@ -1,0 +1,8 @@
+# folders
+/_*
+example/output
+example/source
+
+# files
+*.lnk
+/conf.psd1
