@@ -1,6 +1,5 @@
 @{
   bagPath = ".\example\output"
-  # bagPath = "G:\_backups"
   itemsList = @(
     @{
       label = "New Music"

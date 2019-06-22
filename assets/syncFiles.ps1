@@ -1,7 +1,7 @@
 $opts = $args[0]
 $Source = $opts.Source
 $Destination = $opts.Destination
-$Gap = $opts.Gap
+$Gap = if($opts.Gap){ $opts.Gap }else{ 500 }
 $scriptPath = $opts.scriptPath
 $recursive = if($opts.recursive -eq $false){ $false }else{ $true }
 $filters = if($opts.filters){ $opts.filters }else{ "" }
@@ -33,10 +33,12 @@ else {
 }
 # XD    - Excludes specific directories
 if($excludedFolders){ $CommonRobocopyParams += " /XD $excludedFolders" }
+# XF    - Excludes files that match the specified names or paths. Note that FileName can include wildcard characters (* and ?).
+if($excludedFiles){ $CommonRobocopyParams += " /XF $excludedFiles" }
 
 # /ipg:n - Specifies the inter-packet gap to free bandwidth on slow lines.
 $Robocopy = Start-Process `
   -Wait `
   -WindowStyle Minimized `
   -FilePath robocopy.exe `
-  -ArgumentList "`"$Source`" `"$Destination`" $filters /LOG:`"$logPath`" /ipg:$Gap $CommonRobocopyParams"
+  -ArgumentList "`"$Source`" `"$Destination`" $filters /UNILOG+:`"$logPath`" /IPG:$Gap $CommonRobocopyParams"

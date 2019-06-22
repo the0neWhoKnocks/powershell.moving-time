@@ -6,3 +6,4 @@ example/source
 # files
 *.lnk
 /conf.psd1
+sync.log

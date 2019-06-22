@@ -6,6 +6,12 @@ public static extern IntPtr GetConsoleWindow();
 [DllImport("user32.dll")]
 public static extern bool ShowWindow(IntPtr hWnd, Int32 nCmdShow);
 '
+# .Net methods for preventing the computer from going to sleep
+# source - https://blog.backslasher.net/windows-awake-ps.html
+Add-Type -Name System -Namespace Win32 -MemberDefinition '
+[DllImport("kernel32.dll", CharSet = CharSet.Auto,SetLastError = true)]
+public static extern void SetThreadExecutionState(uint esFlags);
+'
 
 function log($msg) { Write-Host $msg }
 
@@ -89,4 +95,15 @@ function getFolder($initialDirectory){
   }
   
   return $folder
+}
+
+# Requests that the other EXECUTION_STATE flags set remain in effect until SetThreadExecutionState is called again with the ES_CONTINUOUS flag set and one of the other EXECUTION_STATE flags cleared.
+$ES_CONTINUOUS = [uint32]"0x80000000"
+function preventSleep(){
+  # Requests system availability (sleep idle timeout is prevented).
+  $ES_SYSTEM_REQUIRED = [uint32]"0x00000001"
+  [Win32.System]::SetThreadExecutionState($ES_CONTINUOUS -bor $ES_SYSTEM_REQUIRED)
+}
+function allowSleep(){
+  [Win32.System]::SetThreadExecutionState($ES_CONTINUOUS)
 }

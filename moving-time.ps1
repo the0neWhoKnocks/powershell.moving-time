@@ -44,34 +44,39 @@ function setBagPath($path) {
 function onProgress {
   if(Test-Path $LOG_PATH){
     $percentage = 0;
-    $LogContent = Get-Content -Raw -Path $LOG_PATH
-    $msg = ""
-  
-    # If backing up to another drive, this can lag sometimes and logContent
-    # will not be defined, so don't do anything until it is.
-    if($LogContent){
-      $errorMsg = Select-String -CaseSensitive -InputObject "$LogContent" ".* ERROR .*"
-      if($errorMsg){
+    
+    while($null -ne ($line = $global:logFileReader.readLine())) {
+      # Handle errors
+      $errorFound = Select-String -CaseSensitive -InputObject "$line" ".* ERROR .*"
+      if($errorFound){
+        $errorMsg = "$line"
+        while($null -ne ($errLine = $global:logFileReader.readLine())) {
+          $errorMsg += "$nl$errLine"
+        }
+        
         logToColoredOutput `
           @{ color = "WHITE_ON_RED"; text = " ERROR " } `
           @{ color = "ORANGE"; text = " $errorMsg" }
+        
         stopJob
+        
+        break
       }
       else {
-        # Regex - https://docs.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_regular_expressions?view=powershell-6
-        $currFilePath = Select-String -Path "$LOG_PATH" "\t\s\s\t\t\t(.*\.[a-z0-9]{2,4})" | Select-Object -Last 1 | ForEach-Object { $_.Matches[0].Groups[1].Value }
-        if($currFilePath) { $msg = "$currFilePath" }
-        
-        $perc = [Regex]::Matches("$LogContent", '[0-9.]+%$')
-        
-        if($perc.success){
-          $percentage = [int]( $perc.value.replace('%', '') )
+        # Find the current file being processed
+        $currFilePath = [Regex]::Matches("$line", "\t\s\s\t\t\t(.*\.[a-z0-9]{2,4})")
+        if($currFilePath.success) { 
+          $global:progressMsg = "$($currFilePath.value.trim())"
         }
         
-        logToProgress($msg)
-        $gui__progressBar.value = $percentage
+        # Find the percentage-complete for the file being synced
+        $perc = [Regex]::Matches("$line", '[0-9.]+%$')
+        if($perc.success){ $percentage = [int]( $perc.value.replace('%', '') ) }
       }
     }
+    
+    if($global:progressMsg){ logToProgress("$global:progressMsg") }
+    $gui__progressBar.value = $percentage
   }
 }
 
@@ -117,11 +122,15 @@ function syncFiles($pathNdx) {
   }
   if($global:currSync.filters){ $syncArgs["filters"] = $global:currSync.filters }
   if($global:currSync.excludedFolders){ $syncArgs["excludedFolders"] = $global:currSync.excludedFolders }
+  if($global:currSync.excludedFiles){ $syncArgs["excludedFiles"] = $global:currSync.excludedFiles }
   
   $global:timer = New-Object System.Windows.Forms.Timer
   $timer.interval = 100
   
   try {
+    $global:logFileStream = New-Object IO.FileStream("$LOG_PATH", [System.IO.FileMode]::OpenOrCreate, [System.IO.FileAccess]::ReadWrite, [IO.FileShare]::ReadWrite)
+    $global:logFileReader = New-Object System.IO.StreamReader($logFileStream)
+    
     $global:job = Start-Job `
       -Name "fileSync" `
       -ArgumentList ([hashtable]$syncArgs) `
@@ -155,7 +164,10 @@ function syncFiles($pathNdx) {
             $gui__progressBar.ForeColor = "#00FFCC"
             $gui__progressBar.value = 100 # if the process finishes quickly this won't be set
             $global:currSyncNdx = 0
+            $global:logFileReader.Dispose()
+            $global:logFileStream.Dispose()
             Remove-Item "$LOG_PATH"
+            allowSleep
           }
           # items still need to sync, keep going
           else {
@@ -168,6 +180,9 @@ function syncFiles($pathNdx) {
               $global:pathNdx += 1
             }
             
+            $global:logFileReader.Dispose()
+            $global:logFileStream.Dispose()
+            Remove-Item "$LOG_PATH"
             syncFiles($global:pathNdx)
           }
         }
@@ -196,7 +211,10 @@ function stopJob {
       logToOutput("  sync job cancelled")
       logToProgress("")
       $gui__progressBar.value = 0
+      $global:logFileReader.Dispose()
+      $global:logFileStream.Dispose()
       Remove-Item "$LOG_PATH"
+      allowSleep
     }
     # else { logToOutput "  sync job done" }
     
@@ -244,6 +262,7 @@ $gui__startButton.Add_Click({
     $gui__progressBar.style = [System.Windows.Forms.ProgressBarStyle]::Blocks
     $gui__progressBar.ForeColor = "#00CCFF"
     $gui__progressBar.value = 0
+    preventSleep
     syncFiles(0)
   }
 });

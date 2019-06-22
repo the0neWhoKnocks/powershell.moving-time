@@ -51,6 +51,7 @@ are surrounded in `[<NAME>]`.
 | ---- | ---- | ----- |
 | `label` | `String` | The name that will be printed above each item being synced. |
 | `paths` | `Array` of `String` | Absolute or relative path to a folder or file. |
+| `[excludedFiles]` | `String` | A space delimited list of file names or paths that won't be synced. |
 | `[excludedFolders]` | `String` | A space delimited list of folders that won't be synced. |
 | `[filters]` | `String` | Files or file types that will be synced. It uses [Robocopy's `File` syntax](https://docs.microsoft.com/en-us/windows-server/administration/windows-commands/robocopy) for patterns. |
 | `[recursive]` | `Boolean` | All syncs are recursive by default, but if you want to only copy top-level files, you would set this to `$false`. |
